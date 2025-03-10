@@ -18,5 +18,6 @@ urlpatterns = [
     path('games/', PythonGamesView.as_view(), name='games'),
     path('module-explorer/', ExploredGameView.as_view(), name='game1'),
     path('puzzle/', PuzzleView.as_view(), name='puzzle'),
+    path('change-password/',ChangePasswordView,name='change-password'),
 
 ]

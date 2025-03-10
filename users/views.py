@@ -10,8 +10,8 @@ import re
 from .python_groq import *
 from django.http import JsonResponse
 from django.contrib import messages
-
-
+from faculty.forms import *
+from django.contrib.auth import update_session_auth_hash
 
 class UserHomeView(TemplateView):
     template_name = 'userhome.html'
@@ -57,66 +57,107 @@ def view_challenges(request, lang_id):
         
     return render(request, 'challenges.html', {'challenges': challenges, 'language': language})
 
-
+import builtins
 
 def solve_challenge(request, challenge_id):
     challenge = Questions.objects.get(id=challenge_id)
     
     if request.method == "POST":
-        code = request.POST.get('codearea','')
-        print(code)
+        code = request.POST.get('codearea', '')
+        user_input = request.POST.get('user_input', '')
         
-        if  code=='':
-            return redirect('solve_challenge',challenge_id)
+        if code == '':
+            return redirect('solve_challenge', challenge_id)
+        
         try:
             output = None
             original_stdout = sys.stdout
+            original_stdin = sys.stdin
+            
+            # Handle input
+            input_lines = user_input.strip().split('\n')
+            input_line_index = 0
+            
+            def mock_input(prompt=''):
+                nonlocal input_line_index
+                print(prompt, end='')
+                if input_line_index < len(input_lines):
+                    result = input_lines[input_line_index]
+                    input_line_index += 1
+                    print(result)  # Echo the input as if user typed it
+                    return result
+                return ''  # Return empty string if no more input
+            
+            # Set up output capture
             output_buffer = StringIO()
             sys.stdout = output_buffer
+            
+            # Replace built-in input with our mock
+            builtins.input = mock_input
+            
+            # Execute the code
             exec(code, globals(), locals())
+            
+            # Get captured output
             output = output_buffer.getvalue()
-            expected_output = challenge
-            result = check_output_with_groq(code.strip(), expected_output)
+            
+            # Check if the solution is correct
+            result = check_output_with_groq(code.strip(), challenge)
+            
         except Exception as e:
             output = str(e)
-            result = check_error_with_groq(output, challenge,code)
+            result = check_error_with_groq(output, challenge, code)
         finally:
+            # Restore standard I/O
             sys.stdout = original_stdout
+            builtins.input = original_stdin
+        
+        # Analyze the code and provide feedback
         feedback = analyze_code_with_groq(code, output.strip(), challenge)
+        
+        # Extract score from feedback
         match = re.search(r"Score:\s*(\d+)", feedback)
-        score = int(match.group(1)) if match else 5
-        if score == 5 or score ==4:
+        score = int(match.group(1)) if match else 0
+        
+        # Determine if the solution is correct
+        if score >= 4:
             is_correct = 1 
         else: 
-            is_correct =0
+            is_correct = 0
+        
+        # Save the result
         results, created = Result.objects.get_or_create(
             question=challenge,
             user=request.user,
             defaults={"is_correct": is_correct, "score": score, "feedback": feedback},
         )
+        
         if not created:  
             results.is_correct = is_correct
             results.score = score
             results.feedback = feedback
             results.attempt_time = timezone.now()
             results.save()
+        
         return render(request, 'solve_challenge.html', {
             "challenge": challenge,
             "code": code,
+            "user_input": user_input,
             "output": output,
             "feedback": feedback,
             "result": result,
             "score": score
         }) 
+    
     return render(request, 'solve_challenge.html', {
         "challenge": challenge,
         "code": "",
+        "user_input": "",
         "output": "",
         "feedback": "",
         "result": "",
         "score": 0
     })
-
 
 
 
@@ -396,3 +437,20 @@ class PuzzleView(TemplateView):
 class ExploredGameView(TemplateView):
     template_name = 'game1.html'
 
+
+
+@login_required
+def ChangePasswordView(request):
+    if request.method == "POST":
+        form = PasswordChangeForm(user=request.user, data=request.POST)
+        if form.is_valid():
+            user = form.save()
+            update_session_auth_hash(request, user)  
+            messages.success(request, "Your password has been changed successfully!")
+            return redirect("login")  
+        else:
+            messages.error(request, "Please correct the errors below.")
+    else:
+        form = PasswordChangeForm(user=request.user)
+    
+    return render(request, "change_password.html", {"form": form})

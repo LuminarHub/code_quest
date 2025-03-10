@@ -7,6 +7,11 @@ from .models import *
 from django.urls import reverse_lazy
 from django.http import HttpResponse
 from django.contrib import messages
+from django.contrib.auth.tokens import default_token_generator
+from django.core.mail import send_mail
+from django.urls import reverse
+from django.utils.http import urlsafe_base64_encode
+from django.utils.encoding import force_bytes
 # Create your views here.
 
 
@@ -44,6 +49,10 @@ class StudentsList(TemplateView):
 class LoginView(FormView):
     template_name="login.html"
     form_class=LogForm
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # Add any additional context data you might need
+        return context
     def post(self,request,*args,**kwargs):
         form=LogForm(data=request.POST)
         if form.is_valid():  
@@ -288,3 +297,64 @@ def student_results_by_user(request,pk):
         'results': results
     }
     return render(request, 'student_detail.html', context)
+
+
+
+class ForgotPasswordView(FormView):
+    template_name = "forgot_password.html"
+    form_class = PasswordResetForm  
+    def form_valid(self, form):
+        email = form.cleaned_data['email']
+        try:
+            user = CustomUser.objects.get(email=email) 
+            token = default_token_generator.make_token(user)
+            uid = urlsafe_base64_encode(force_bytes(user.pk))
+            print('uid')
+            reset_url = self.request.build_absolute_uri(
+                reverse('reset_password_confirm', kwargs={'uidb64': uid, 'token': token})
+            )
+            send_mail(
+                'Password Reset for CodeQuest',
+                f'Please click the following link to reset your password: {reset_url}',
+                'jipsongeorge753@gmail.com',  
+                [email],
+                fail_silently=False,
+            )
+            messages.success(self.request, "Password reset link has been sent to your email.")
+            return redirect('login')
+        except User.DoesNotExist:
+            messages.success(self.request, "Password reset link has been sent to your email if the account exists.")
+            return redirect('login')
+
+from django.utils.http import urlsafe_base64_decode
+
+
+class ResetPasswordConfirmView(FormView):
+    template_name = "reset_password.html"
+    form_class = SetPasswordForm
+    
+    def dispatch(self, request, *args, **kwargs):
+        self.uid = kwargs.get('uidb64')
+        self.token = kwargs.get('token')
+        return super().dispatch(request, *args, **kwargs)
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['uidb64'] = self.uid
+        context['token'] = self.token
+        return context
+    def form_valid(self, form):
+        try:
+            from django.utils.http import urlsafe_base64_decode
+            uid = urlsafe_base64_decode(self.uid).decode()
+            user = CustomUser.objects.get(pk=uid)
+            if default_token_generator.check_token(user, self.token):
+                user.set_password(form.cleaned_data['password1'])
+                user.save()
+                messages.success(self.request, "Your password has been reset successfully. You can now login.")
+                return redirect('login')
+            else:
+                messages.error(self.request, "The reset link is invalid or has expired.")
+                return redirect('forgot_password')
+        except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+            messages.error(self.request, "The reset link is invalid or has expired.")
+            return redirect('forgot_password')

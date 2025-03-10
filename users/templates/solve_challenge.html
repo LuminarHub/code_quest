@@ -30,6 +30,7 @@
             border-radius: 20px;
             padding: 2rem;
             margin-top: 3rem;
+            margin-bottom: 3rem;
             box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
         }
 
@@ -60,6 +61,14 @@
             white-space: pre-wrap;
         }
 
+        .input-container {
+            background: #f3f3f3;
+            padding: 1rem;
+            border-radius: 10px;
+            margin-top: 1rem;
+            margin-bottom: 1rem;
+        }
+
         .btn-custom {
             background-color: #4CAF50;
             color: white;
@@ -72,6 +81,38 @@
         .btn-custom:hover {
             background-color: #45a049;
         }
+        
+        .hint-container {
+            background: #fff3cd;
+            color: #856404;
+            padding: 1rem;
+            border-radius: 10px;
+            margin-top: 1rem;
+            display: none;
+        }
+        
+        .result-badge {
+            font-size: 14px;
+            padding: 5px 10px;
+            border-radius: 15px;
+            display: inline-block;
+            margin-bottom: 10px;
+        }
+        
+        .result-correct {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        
+        .result-incorrect {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        
+        .result-partial {
+            background-color: #fff3cd;
+            color: #856404;
+        }
     </style>
 </head>
 
@@ -81,32 +122,62 @@
         <h2 class="mb-4">Challenge
             <a href="{% url 'view_challenges' challenge.lang.id %}" class="btn btn-info text-white" style="float: right;">Back</a>
         </h2>
-        
         <div class="challenge-description">
             {{ challenge.question }}
         </div>
-
         <form method="POST">
             {% csrf_token %}
             <textarea id="codearea" name="codearea">{{ code }}</textarea>
             
+            <div class="input-container">
+                <h5>Input:</h5>
+                <div class="form-group">
+                    <textarea class="form-control" id="user_input" name="user_input" rows="3" placeholder="Enter input values here, each on a new line">{{ user_input }}</textarea>
+                    <small class="text-muted">Values that would normally be entered via input() during execution</small>
+                </div>
+            </div>
+            
             <div class="d-flex justify-content-between align-items-center mt-3">
-                <button type="submit" class="btn btn-custom">
-                    <i class="material-icons" style="vertical-align: middle;">play_arrow</i>
-                    Run Code
-                </button>
-                <button type="button" class="btn btn-outline-secondary" onclick="clearCode()">
-                    <i class="material-icons" style="vertical-align: middle;">clear</i>
-                    Clear
+                <div>
+                    <button type="submit" class="btn btn-custom me-2">
+                        <i class="material-icons" style="vertical-align: middle;">play_arrow</i>
+                        Run Code
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" onclick="clearCode()">
+                        <i class="material-icons" style="vertical-align: middle;">clear</i>
+                        Clear
+                    </button>
+                </div>
+                <button type="button" id="hint-button" class="btn btn-outline-warning" onclick="toggleHint()">
+                    <i class="material-icons" style="vertical-align: middle;">lightbulb</i>
+                    Hint
                 </button>
             </div>
         </form>
 
+        {% if output or result %}
         <div class="output-container">
-            <h5 class="">Output:</h5>
+            <h5>Output:</h5>
             <pre id="output">{{ output }}</pre>
-            <div>{{ result }}</div>
-            <!-- <div></div> -->
+            
+            {% if score %}
+            <div class="mt-3">
+                {% if score == 5 %}
+                <div class="result-badge result-correct">Correct Solution! ✓</div>
+                {% elif score > 0 %}
+                <div class="result-badge result-partial">Partially Correct</div>
+                {% else %}
+                <div class="result-badge result-incorrect">Incorrect Solution ✗</div>
+                {% endif %}
+                <!-- <div>{{ result }}</div> -->
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+        
+        <div class="hint-container" id="hint-box">
+            <h5><i class="material-icons" style="vertical-align: middle; font-size: 18px;">lightbulb</i> Hint:</h5>
+            <p>{{ result }}</p>
         </div>
     </div>
 </div>
@@ -133,6 +204,16 @@
     function clearCode() {
         editor.setValue("");
         document.getElementById('output').textContent = "";
+        document.getElementById('user_input').value = "";
+    }
+    
+    function toggleHint() {
+        var hintBox = document.getElementById('hint-box');
+        if (hintBox.style.display === 'none' || hintBox.style.display === '') {
+            hintBox.style.display = 'block';
+        } else {
+            hintBox.style.display = 'none';
+        }
     }
 </script>
 </body>

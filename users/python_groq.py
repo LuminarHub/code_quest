@@ -1,10 +1,6 @@
 
 import sys
 from io import StringIO
-
-
-
-# Set up your GROQ API key
 from groq import Groq
 
 GROQ_API_KEY = "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"

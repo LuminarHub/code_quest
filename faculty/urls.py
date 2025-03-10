@@ -25,4 +25,6 @@ urlpatterns = [
     path('add-question/', add_question, name='add_question'),
     path('student-results/<int:pk>/',student_results, name='student_results'),
     path('student-detail/<int:pk>/',student_results_by_user, name='student_detail'),
+    path('forgot-password/', ForgotPasswordView.as_view(), name='forgot_password'),
+    path('reset-password/<uidb64>/<token>/', ResetPasswordConfirmView.as_view(), name='reset_password_confirm'),
 ]
