@@ -51,8 +51,7 @@ class LoginView(FormView):
     form_class=LogForm
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        # Add any additional context data you might need
-        return context
+        return context 
     def post(self,request,*args,**kwargs):
         form=LogForm(data=request.POST)
         if form.is_valid():  
@@ -306,7 +305,11 @@ class ForgotPasswordView(FormView):
     def form_valid(self, form):
         email = form.cleaned_data['email']
         try:
-            user = CustomUser.objects.get(email=email) 
+            try:
+                user = CustomUser.objects.get(email=email) 
+            except CustomUser.DoesNotExist:
+                messages.error(self.request, "User does not exist")
+                return redirect('forgot_password')
             token = default_token_generator.make_token(user)
             uid = urlsafe_base64_encode(force_bytes(user.pk))
             print('uid')
@@ -358,3 +361,84 @@ class ResetPasswordConfirmView(FormView):
         except (TypeError, ValueError, OverflowError, User.DoesNotExist):
             messages.error(self.request, "The reset link is invalid or has expired.")
             return redirect('forgot_password')
+        
+        
+from django.db.models import Sum,Count,Q
+from django.db.models.functions import Coalesce  
+from django.http import JsonResponse
+
+def admin_community(request):
+    discussions = Discussion.objects.all().order_by('-created_at')
+    tags = Tag.objects.all()
+    query = request.GET.get('search')
+    if query:
+        discussions = discussions.filter(
+            Q(title__icontains=query) |
+            Q(content__icontains=query) |
+            Q(tags__name__icontains=query)
+        ).distinct()
+    tag_filter = request.GET.get('tag')
+    if tag_filter:
+        discussions = discussions.filter(tags__name=tag_filter)
+    
+    context = {
+        'community': discussions,
+        'tags': tags,
+    }
+    return render(request, 'admin_community.html', context)
+
+def create_discussion_admin(request):
+    if request.method == 'POST':
+        title = request.POST.get('title')
+        content = request.POST.get('content')
+        tag_names = request.POST.getlist('tags')
+        
+        discussion = Discussion.objects.create(
+            title=title,
+            content=content,
+            author=request.user
+        )
+        for tag_name in tag_names:
+            tag, created = Tag.objects.get_or_create(name=tag_name)
+            discussion.tags.add(tag)
+        return redirect('admin_community')
+    return redirect('admin_community')
+
+
+def like_discussion_admin(request, discussion_id):
+    if request.method == 'POST':
+        discussion = Discussion.objects.get(id=discussion_id)
+        discussion.likes += 1
+        discussion.save()
+        return redirect('admin_community')
+    
+    return redirect('admin_community')
+
+
+def add_comment_admin(request, discussion_id):
+    if request.method == 'POST':
+        discussion = Discussion.objects.get(id=discussion_id)
+        content = request.POST.get('content')
+        
+        comment = Comment.objects.create(
+            discussion=discussion,
+            author=request.user,
+            content=content
+        )
+        
+        return redirect('admin_community')
+    return JsonResponse({'error': 'Invalid request'}, status=400)
+
+
+
+def delete_discussion_admin(request, discussion_id):
+    discussion = get_object_or_404(Discussion, id=discussion_id)
+
+    if request.user == discussion.author:  # Ensure only the author can delete
+        discussion.delete()
+        messages.success(request, "Discussion deleted successfully!")
+    else:
+        messages.error(request, "You are not allowed to delete this discussion.")
+
+    return redirect('admin_community')
+

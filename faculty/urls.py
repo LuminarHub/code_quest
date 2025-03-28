@@ -16,6 +16,12 @@ urlpatterns = [
     path('add-notes/', add_notes, name='add_notes'),
     path('add-files/', add_files, name='add_files'),
     path('add-lang/', add_lang, name='add_lang'),
+    path('admin_community/', admin_community, name='admin_community'),
+    path('admin_community/create/', create_discussion_admin, name='create_discussion_admin'),
+    path('admin_community/like/<int:discussion_id>/', like_discussion_admin, name='like_discussion_admin'),
+    path('admin_community/comment/<int:discussion_id>/', add_comment_admin, name='add_comment_admin'),
+    path('delete-discussion-admin/<int:discussion_id>/', delete_discussion_admin, name='delete_discussion_admin'),
+    
     path('delete-note/<int:note_id>/', delete_note, name='delete_note'),
     path('delete-file/<int:file_id>/', delete_file, name='delete_file'),
     path('delete-lang/<int:lang_id>/', delete_lang, name='delete_lang'),

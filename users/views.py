@@ -403,6 +403,8 @@ class MaterialsUserView(TemplateView):
         for video in videos:
             if "youtube.com" in video.text or "youtu.be" in video.text:
                 video.embed_url = self.convert_youtube_url(video.text)  
+                video.save()
+                
             else:
                 video.embed_url = video.text  # Keep other video URLs as is
 
